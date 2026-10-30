@@ -39,6 +39,7 @@
     if (lenis) lenis.scrollTo(el, { offset: el.id === 'hero' ? 0 : -20, duration: 1.4 });
     else el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
   };
+  window.AK = { lenis, scrollToTarget, reduce, fine, hasGsap, vel: () => 0 };
   $$('a[href^="#"]').forEach(a => a.addEventListener('click', e => {
     const id = a.getAttribute('href');
     if (id.length < 2 || !$(id)) return;
@@ -307,7 +308,8 @@
   };
   if (term) {
     const full = codeLines.map(l => l[1]).join('\n');
-    if (reduce) { term.innerHTML = full; }
+    const ready = () => { term.dataset.ready = '1'; document.dispatchEvent(new CustomEvent('ak:term-ready')); };
+    if (reduce) { term.innerHTML = full; ready(); }
     else {
       prepDiagram();
       term.innerHTML = '';
@@ -326,6 +328,7 @@
           if (tag === 'done') runPacket();
           await sleep(tag ? 520 : 70);
         }
+        ready();
       };
       const tio = new IntersectionObserver(([en]) => { if (en.isIntersecting) { tio.disconnect(); run(); } }, { threshold: 0.35 });
       tio.observe($('.term'));
@@ -493,7 +496,44 @@
 
   /* ---------------- marquee: pause offscreen ---------------- */
   const marquee = $('.marquee');
-  if (marquee) new IntersectionObserver(([en]) => marquee.classList.toggle('is-off', !en.isIntersecting)).observe(marquee);
+  let mqOn = true, mqHover = false;
+  if (marquee) {
+    new IntersectionObserver(([en]) => { mqOn = en.isIntersecting; marquee.classList.toggle('is-off', !en.isIntersecting); }).observe(marquee);
+    marquee.addEventListener('pointerenter', () => { mqHover = true; });
+    marquee.addEventListener('pointerleave', () => { mqHover = false; });
+  }
+  /* scroll velocity: drives marquee speed/direction and a subtle skew */
+  let sv = 0, lastSY = window.scrollY;
+  window.AK.vel = () => sv;
+  if (!reduce) {
+    const tracks = $$('.marquee__track').map((t, i) => ({ t, x: 0, dir: i % 2 ? 1 : -1, w: 0 }));
+    root.classList.add('js-marquee');
+    const measure = () => tracks.forEach(k => { k.w = k.t.scrollWidth / 2; });
+    measure(); window.addEventListener('resize', measure);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    let lastSkew = 0;
+    const vloop = () => {
+      requestAnimationFrame(vloop);
+      const raw = lenis ? (lenis.velocity || 0) : (window.scrollY - lastSY);
+      lastSY = window.scrollY;
+      sv += (raw - sv) * 0.12;
+      if (Math.abs(sv) < 0.01) sv = 0;
+      const skew = Math.max(-7, Math.min(7, sv * 0.3));
+      if (mqOn && !document.hidden) {
+        const boost = Math.min(Math.abs(sv) * 0.55, 14), sign = sv < -0.5 ? -1 : 1;
+        tracks.forEach(k => {
+          if (!k.w) return;
+          k.x += k.dir * sign * ((mqHover ? 0.2 : 0.6) + boost);
+          if (k.x <= -k.w) k.x += k.w; if (k.x > 0) k.x -= k.w;
+          k.t.style.transform = `translate3d(${k.x.toFixed(2)}px,0,0) skewX(${(-skew).toFixed(2)}deg)`;
+        });
+      }
+      if (hasGsap && track && root.classList.contains('h-scroll') && Math.abs(skew - lastSkew) > 0.05) {
+        G.set(track, { skewX: -skew * 0.6 }); lastSkew = skew;
+      }
+    };
+    requestAnimationFrame(vloop);
+  }
 
   /* ---------------- hero scene: WebGL (Three.js) or 2D fallback ---------------- */
   const hero = $('.hero'), canvas = $('#hero-canvas');
@@ -519,6 +559,46 @@
     };
     fl();
   }
+
+  /* hero interaction: drag to orbit (mouse), click / tap the scene to deploy a node */
+  const heroCtl = { spawn: null, dragging: false, orbit: { x: 0, y: 0, vx: 0, vy: 0 } };
+  window.AK.hero = heroCtl;
+  if (!reduce) {
+    let drag = null, dragged = false;
+    const blocked = t => t.closest('.hero__content > *, a, button, input, .floater');
+    hero.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || blocked(e.target)) return;
+      drag = { x: e.clientX, y: e.clientY }; dragged = false;
+    });
+    window.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!dragged && Math.hypot(dx, dy) > 6) { dragged = true; heroCtl.dragging = true; hero.classList.add('is-dragging'); }
+      if (dragged) {
+        const o = heroCtl.orbit;
+        o.vy = dx * 0.006; o.vx = dy * 0.004; o.y += o.vy; o.x = Math.max(-0.7, Math.min(0.7, o.x + o.vx));
+        drag.x = e.clientX; drag.y = e.clientY;
+      }
+    });
+    window.addEventListener('pointerup', () => {
+      if (!drag) return;
+      drag = null; heroCtl.dragging = false; hero.classList.remove('is-dragging');
+      setTimeout(() => { dragged = false; }, 0);
+    });
+    hero.addEventListener('click', e => {
+      if (dragged || blocked(e.target) || !heroCtl.spawn) return;
+      heroCtl.spawn(e.clientX, e.clientY);
+      const pop = document.createElement('span');
+      pop.className = 'hero__pop'; pop.textContent = '+ node deployed';
+      const r = hero.getBoundingClientRect();
+      pop.style.left = (e.clientX - r.left) + 'px'; pop.style.top = (e.clientY - r.top) + 'px';
+      hero.appendChild(pop); setTimeout(() => pop.remove(), 1100);
+    });
+  }
+  const orbitStep = () => {
+    const o = heroCtl.orbit;
+    if (!heroCtl.dragging) { o.y += o.vy; o.vy *= 0.94; o.vx *= 0.9; o.x *= 0.985; }
+  };
 
   const webglOK = (() => { try { const c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl'))); } catch (e) { return false; } })();
   const useWebGL = webglOK && !reduce && !saveData && window.innerWidth >= 900;
@@ -576,7 +656,8 @@
     const linkPairs = [[0, 1], [1, 2], [2, 0]];
     const lineMat = new THREE.LineBasicMaterial({ color: 0x6366f1, transparent: true, opacity: 0.35 });
     const lineGeo = new THREE.BufferGeometry();
-    const linePos = new Float32Array((linkPairs.length + nodes.length) * 6);
+    const MAX_SPAWN = 12, spawned = [];
+    const linePos = new Float32Array((linkPairs.length + nodes.length + MAX_SPAWN) * 6);
     lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
     world.add(new THREE.LineSegments(lineGeo, lineMat));
     // packets travelling between clouds (migration flow)
@@ -594,6 +675,35 @@
     scene.add(dust);
 
     const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+    // click-to-deploy: new container nodes fly in, with a packet burst
+    const burstGeo = new THREE.SphereGeometry(0.07, 10, 10);
+    const burst = Array.from({ length: 48 }, (_, i) => {
+      const m = new THREE.Mesh(burstGeo, new THREE.MeshBasicMaterial({ color: [0x4f46e5, 0x14b8a6, 0xf97362, 0xa855f7][i % 4], transparent: true }));
+      m.visible = false; world.add(m); return { m, v: new THREE.Vector3(), life: 0 };
+    });
+    const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
+    const spawnColors = [0x6366f1, 0x14b8a6, 0xa855f7, 0x60a5fa, 0xf97362];
+    heroCtl.spawn = (cx, cy) => {
+      const r = canvas.getBoundingClientRect();
+      ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      if (!ray.ray.intersectPlane(plane, hit)) return;
+      const local = world.worldToLocal(hit.clone());
+      const c = clusters.reduce((b, cl) => (cl.group.position.distanceTo(local) < b.group.position.distanceTo(local) ? cl : b));
+      const m = new THREE.Mesh(Math.random() < 0.5 ? boxGeo : srvGeo, mat(spawnColors[(Math.random() * spawnColors.length) | 0]));
+      m.userData = { ang: Math.random() * 6.28, rad: 2.4 + Math.random() * 0.9, y: (Math.random() - 0.5) * 1.4, spd: 0.2 + Math.random() * 0.2, ph: Math.random() * 6, born: clock.getElapsedTime(), from: local.clone() };
+      m.position.copy(local); m.scale.setScalar(0.01);
+      world.add(m); spawned.push({ m, c });
+      if (spawned.length > MAX_SPAWN) { const old = spawned.shift(); world.remove(old.m); old.m.material.dispose(); }
+      let n = 0;
+      for (const b of burst) {
+        if (b.life > 0) continue;
+        b.life = 1; b.m.visible = true; b.m.position.copy(local);
+        b.v.set(Math.random() - 0.5, Math.random() - 0.5, (Math.random() - 0.5) * 0.6).normalize().multiplyScalar(0.06 + Math.random() * 0.08);
+        if (++n >= 16) break;
+      }
+    };
+    root.classList.add('hero-playable');
     const resize = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
       renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -609,8 +719,10 @@
       requestAnimationFrame(render);
       if (!running || !heroVisible) { clock.getDelta(); return; }
       const t = clock.getElapsedTime();
-      world.rotation.y += ((pointer.x * 0.35 + Math.sin(t * 0.15) * 0.15) - world.rotation.y) * 0.05;
-      world.rotation.x += ((pointer.y * 0.2) - world.rotation.x) * 0.05;
+      orbitStep();
+      const ob = heroCtl.orbit;
+      world.rotation.y += ((pointer.x * 0.35 + Math.sin(t * 0.15) * 0.15 + ob.y) - world.rotation.y) * 0.08;
+      world.rotation.x += ((pointer.y * 0.2 + ob.x) - world.rotation.x) * 0.08;
       camera.position.y = -window.scrollY * 0.004;
       clusters.forEach((c, i) => { c.group.position.y = c.pos.y + Math.sin(t * 0.8 + i * 2) * 0.18; c.core.rotation.y = t * 0.3; c.ring.rotation.z = t * (0.2 + i * 0.05); });
       nodes.forEach(({ m }) => {
@@ -628,6 +740,21 @@
         const gp = c.group.position;
         linePos.set([gp.x, gp.y, gp.z, gp.x + m.position.x, gp.y + m.position.y, gp.z + m.position.z], o); o += 6;
       });
+      spawned.forEach(({ m, c }) => {
+        const u = m.userData, a = u.ang + t * u.spd, gp = c.group.position;
+        tmpA.set(gp.x + Math.cos(a) * u.rad, gp.y + u.y + Math.sin(t + u.ph) * 0.15, gp.z + Math.sin(a) * u.rad * 0.6);
+        const k = Math.min(1, (t - u.born) / 0.9), e = 1 - Math.pow(1 - k, 3);
+        m.position.lerpVectors(u.from, tmpA, e); m.scale.setScalar(Math.max(0.01, e));
+        m.rotation.x += 0.01; m.rotation.y += 0.012;
+        linePos.set([gp.x, gp.y, gp.z, m.position.x, m.position.y, m.position.z], o); o += 6;
+      });
+      lineGeo.setDrawRange(0, o / 3);
+      burst.forEach(b => {
+        if (b.life <= 0) return;
+        b.life -= 0.022; b.m.position.add(b.v); b.v.multiplyScalar(0.95);
+        b.m.scale.setScalar(Math.max(0.01, b.life * 1.4)); b.m.material.opacity = Math.max(0, b.life);
+        if (b.life <= 0) b.m.visible = false;
+      });
       lineGeo.attributes.position.needsUpdate = true;
       packets.forEach(p => {
         p.t += p.spd; if (p.t > 1) p.t = 0;
@@ -644,21 +771,29 @@
   function init2D() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    let W, H, dpr, nodes = [], pulses = [];
+    let W, H, dpr, nodes = [], pulses = [], rings = [], baseN = 0;
     const colors = ['37,99,235', '79,70,229', '13,148,136', '244,63,94', '124,58,237'];
     const mouse = { x: -1e4, y: -1e4 };
     const resize = () => {
       dpr = Math.min(devicePixelRatio || 1, 2); W = canvas.clientWidth; H = canvas.clientHeight;
       canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const n = Math.round(Math.min(90, Math.max(28, (W * H) / 18000)));
+      baseN = n;
       nodes = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, r: Math.random() * 2 + 1.2, c: colors[(Math.random() * colors.length) | 0] }));
     };
     const LINK = 130;
     const draw = () => {
       ctx.clearRect(0, 0, W, H);
+      rings = rings.filter(g => g.t < 1);
+      for (const g of rings) {
+        g.t += 0.025;
+        ctx.strokeStyle = `rgba(79,70,229,${(1 - g.t) * 0.6})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(g.x, g.y, 6 + g.t * 70, 0, Math.PI * 2); ctx.stroke();
+      }
       for (const p of nodes) {
         if (!reduce) {
           p.x += p.vx; p.y += p.vy;
+          if (p.boost) { p.vx *= 0.97; p.vy *= 0.97; if (Math.hypot(p.vx, p.vy) < 0.35) p.boost = false; }
           if (p.x < 0 || p.x > W) p.vx *= -1; if (p.y < 0 || p.y > H) p.vy *= -1;
           const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
           if (d < 110 && d > 0) { p.x += dx / d; p.y += dy / d; }
@@ -681,6 +816,18 @@
       }
     };
     resize();
+    if (!reduce) {
+      heroCtl.spawn = (cx, cy) => {
+        const r = canvas.getBoundingClientRect(), x = cx - r.left, y = cy - r.top;
+        rings.push({ x, y, t: 0 });
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * Math.PI * 2 + Math.random(), sp = 2 + Math.random() * 2;
+          nodes.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: Math.random() * 2 + 2, c: colors[(Math.random() * colors.length) | 0], boost: true });
+        }
+        if (nodes.length > baseN + 48) nodes.splice(baseN, 6);
+      };
+      root.classList.add('hero-playable');
+    }
     hero.addEventListener('pointermove', e => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; });
     let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); if (reduce) draw(); }, 150); });
     if (reduce) { draw(); return; }

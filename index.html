@@ -66,6 +66,7 @@
       <a href="#skills">Skills</a>
       <a href="#credentials">Credentials</a>
     </nav>
+    <button class="nav__cmd" type="button" aria-label="Open command palette (press / or Ctrl K)" aria-haspopup="dialog" aria-controls="cmdk"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><kbd>/</kbd></button>
     <a href="#contact" class="nav__cta magnetic">Get in touch</a>
     <button class="nav__toggle" aria-expanded="false" aria-controls="menu" aria-label="Open menu"><span></span><span></span></button>
   </div>
@@ -73,13 +74,14 @@
 <div class="menu" id="menu" aria-hidden="true">
   <nav class="menu__links" aria-label="Mobile">
     <a href="#impact"><small>01</small>Impact</a>
-    <a href="#expertise"><small>02</small>Expertise</a>
-    <a href="#migrations"><small>03</small>Migrations</a>
-    <a href="#projects"><small>04</small>Projects</a>
-    <a href="#experience"><small>05</small>Experience</a>
-    <a href="#skills"><small>06</small>Skills</a>
-    <a href="#credentials"><small>07</small>Credentials</a>
-    <a href="#contact"><small>08</small>Contact</a>
+    <a href="#playground"><small>02</small>Playground</a>
+    <a href="#expertise"><small>03</small>Expertise</a>
+    <a href="#migrations"><small>04</small>Migrations</a>
+    <a href="#projects"><small>05</small>Projects</a>
+    <a href="#experience"><small>06</small>Experience</a>
+    <a href="#skills"><small>07</small>Skills</a>
+    <a href="#credentials"><small>08</small>Credentials</a>
+    <a href="#contact"><small>09</small>Contact</a>
   </nav>
   <p class="menu__foot">akachroo762@gmail.com · Australia</p>
 </div>
@@ -88,6 +90,7 @@
 
 <!-- HERO -->
 <section class="hero" id="hero" aria-labelledby="hero-title">
+  <p class="hero__hint" aria-hidden="true"><span class="hero__hint-d">Drag to orbit · click the scene to deploy a node</span><span class="hero__hint-t">Tap the scene to deploy a node</span></p>
   <div class="mesh" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <div class="hero__grid" aria-hidden="true"></div>
   <div class="hero__scene" aria-hidden="true">
@@ -103,7 +106,7 @@
   </div>
   <div class="container hero__content">
     <p class="eyebrow" data-hero><span class="pulse" aria-hidden="true"></span> Based in Australia · Full-stack cloud engineer</p>
-    <h1 id="hero-title" class="hero__title"><span class="line"><span class="line__in" data-hero>Aditya</span></span> <span class="line"><span class="line__in grad" data-hero>Kachroo</span></span></h1>
+    <h1 id="hero-title" class="hero__title" aria-label="Aditya Kachroo"><span class="line" aria-hidden="true"><span class="line__in" data-hero>Aditya</span></span> <span class="line" aria-hidden="true"><span class="line__in grad" data-hero>Kachroo</span></span></h1>
     <p class="hero__role" data-hero>
       <span class="sr-only">Full-stack cloud engineer: web development, backend programming and cloud infrastructure across Azure, AWS and Oracle Cloud.</span>
       <span aria-hidden="true" class="mono">&gt; <span id="typed">Full-Stack Cloud Engineer</span><span class="caret"></span></span>
@@ -174,6 +177,11 @@
           <text x="130" y="232" text-anchor="middle" class="cost__lab">Before</text>
           <text x="280" y="232" text-anchor="middle" class="cost__lab">After</text>
         </svg>
+        <div class="cost__ctl">
+          <label for="cost-range">Drag to replay the optimisation <output id="cost-out" for="cost-range">100%</output></label>
+          <input type="range" id="cost-range" min="0" max="100" value="100" step="1" aria-describedby="cost-cap">
+          <p class="cost__readout" aria-live="polite">Annual spend <b id="cost-now">$1.1M</b> · removed <b id="cost-saved">$400K</b></p>
+        </div>
         <figcaption id="cost-cap">USD, per year. <b>$400K</b> removed through architecture changes, Savings Plans, Reserved Instances and automated environment scheduling.</figcaption>
       </figure>
     </div>
@@ -218,7 +226,9 @@
     <div class="iac__grid">
       <div class="term" data-reveal>
         <div class="term__bar"><i></i><i></i><i></i><span>platform/main.tf</span></div>
-        <pre class="term__body" aria-label="Example Terraform configuration and apply output"><code id="term-code"></code><span class="term__cursor" aria-hidden="true"></span></pre>
+        <pre class="term__body" data-lenis-prevent tabindex="0" aria-label="Example Terraform configuration and apply output"><code id="term-code"></code><span class="term__cursor" aria-hidden="true"></span></pre>
+        <form class="term__prompt" id="term-form" autocomplete="off" hidden><label for="term-input" class="sr-only">Terminal command</label><span class="p" aria-hidden="true">$</span><input id="term-input" type="text" spellcheck="false" autocapitalize="off" enterkeyhint="send" placeholder="type 'help' and press Enter"></form>
+        <div class="term__chips" aria-label="Suggested terminal commands"><button type="button" data-cmd="help">help</button><button type="button" data-cmd="whoami">whoami</button><button type="button" data-cmd="skills">skills</button><button type="button" data-cmd="ls projects">ls projects</button><button type="button" data-cmd="certs">certs</button><button type="button" data-cmd="clear">clear</button></div>
       </div>
       <div class="diagram" data-reveal>
         <svg class="diagram__svg" viewBox="0 0 520 420" role="img" aria-label="Diagram: CDN and WAF in front of a Kubernetes cluster in a virtual network, with private subnets for the database and a key vault">
@@ -239,12 +249,47 @@
   </div>
 </section>
 
+<!-- PLAYGROUND: scripted prompt-to-infrastructure demo (no AI, no network calls) -->
+<section class="section section--alt pg" id="playground" aria-labelledby="pg-title">
+  <div class="container">
+    <header class="section__head">
+      <p class="kicker" data-reveal>04 · Prompt → platform</p>
+      <h2 id="pg-title" data-split>Describe a change, watch the platform respond</h2>
+      <p class="section__sub" data-reveal>Type a request or pick a preset. This is a scripted, offline demo: no AI and no network calls. The replies are pre-written, illustrative, and based only on the work described on this page.</p>
+    </header>
+    <div class="pg__grid" data-reveal>
+      <div class="pg__console">
+        <div class="pg__bar"><span class="pg__dot"></span><span>platform-assistant</span><em>scripted demo</em></div>
+        <div class="pg__log" id="pg-log" aria-live="polite" data-lenis-prevent>
+          <p class="pg__msg pg__msg--bot">Hi! Ask me to change the platform, or try a preset below.</p>
+        </div>
+        <div class="pg__presets" aria-label="Preset prompts">
+          <button type="button" class="pg-chip" data-prompt="Migrate 78 environments to Azure">Migrate 78 environments to Azure</button>
+          <button type="button" class="pg-chip" data-prompt="Add a CI/CD pipeline">Add a CI/CD pipeline</button>
+          <button type="button" class="pg-chip" data-prompt="Cut cloud costs">Cut cloud costs</button>
+          <button type="button" class="pg-chip" data-prompt="Deploy to Kubernetes">Deploy to Kubernetes</button>
+          <button type="button" class="pg-chip" data-prompt="Enable DR failover">Enable DR failover</button>
+        </div>
+        <form class="pg__form" id="pg-form" autocomplete="off">
+          <label for="pg-input" class="sr-only">Describe an infrastructure change</label>
+          <input id="pg-input" type="text" maxlength="90" spellcheck="false" enterkeyhint="send" placeholder="e.g. cut cloud costs">
+          <button class="pg__send" type="submit" aria-label="Run prompt"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+        </form>
+      </div>
+      <div class="pg__stage">
+        <svg id="pg-svg" class="pg__svg" viewBox="0 0 560 380" role="img" aria-label="Animated diagram that responds to the prompt"></svg>
+        <div class="pg__hud"><span id="pg-hud-label">Waiting for a prompt</span><b id="pg-hud-val"></b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- MIGRATION STORY: pinned, scroll-scrubbed -->
 <section class="story" id="story" aria-labelledby="story-title">
   <div class="story__pin">
     <div class="container story__inner">
       <div class="story__copy">
-        <p class="kicker">04 · Migration in motion</p>
+        <p class="kicker">05 · Migration in motion</p>
         <h2 id="story-title">Moving a platform from <span class="c-aws">AWS</span> to <span class="c-az">Azure</span></h2>
         <ol class="story__steps">
           <li data-step="0"><b>Scope &amp; estimate</b><span>Workloads, dependencies and outage windows mapped.</span></li>
@@ -291,7 +336,7 @@
 <section class="section pipeline" id="pipeline" aria-labelledby="pipe-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>05 · Delivery</p>
+      <p class="kicker" data-reveal>06 · Delivery</p>
       <h2 id="pipe-title" data-split>Every change, through the pipeline</h2>
       <p class="section__sub" data-reveal>Manual deployments replaced by pipelines and Infrastructure as Code: releases moved from monthly to weekly.</p>
     </header>
@@ -314,7 +359,7 @@
 <section class="section section--alt" id="expertise" aria-labelledby="expertise-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>06 · Expertise</p>
+      <p class="kicker" data-reveal>07 · Expertise</p>
       <h2 id="expertise-title" data-split>What I do</h2>
       <p class="section__sub" data-reveal>Full-stack cloud engineering, from the code in the browser to the platform it runs on.</p>
     </header>
@@ -358,7 +403,7 @@
 <section class="section migs" id="migrations" aria-labelledby="mig-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>07 · Cloud migrations</p>
+      <p class="kicker" data-reveal>08 · Cloud migrations</p>
       <h2 id="mig-title" data-split>Migrations delivered</h2>
       <p class="section__sub" data-reveal>From managed services, data centres and legacy pipelines to modern, automated platforms.</p>
     </header>
@@ -445,7 +490,7 @@
 <section class="section section--alt" id="projects" aria-labelledby="proj-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>08 · Notable projects</p>
+      <p class="kicker" data-reveal>09 · Notable projects</p>
       <h2 id="proj-title" data-split>Platforms &amp; programs I've built</h2>
     </header>
     <div class="projects">
@@ -479,7 +524,7 @@
 <section class="section" id="experience" aria-labelledby="exp-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>09 · Experience</p>
+      <p class="kicker" data-reveal>10 · Experience</p>
       <h2 id="exp-title" data-split>Career timeline</h2>
     </header>
     <ol class="timeline">
@@ -496,7 +541,7 @@
 <section class="section section--alt" id="skills" aria-labelledby="skills-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>10 · Tech stack</p>
+      <p class="kicker" data-reveal>11 · Tech stack</p>
       <h2 id="skills-title" data-split>Languages, frameworks &amp; platforms</h2>
     </header>
     <div class="filters" role="group" aria-label="Filter skills" data-reveal>
@@ -525,7 +570,7 @@
 <section class="section" id="credentials" aria-labelledby="cred-title">
   <div class="container">
     <header class="section__head">
-      <p class="kicker" data-reveal>11 · Credentials</p>
+      <p class="kicker" data-reveal>12 · Credentials</p>
       <h2 id="cred-title" data-split>Certifications &amp; education</h2>
     </header>
     <div class="certs">
@@ -551,7 +596,7 @@
     <span class="orbit orbit--4"><svg class="icon3d"><use href="#i-db"/></svg></span>
   </div>
   <div class="container cta__inner">
-    <p class="kicker kicker--light" data-reveal>12 · Contact</p>
+    <p class="kicker kicker--light" data-reveal>13 · Contact</p>
     <h2 id="contact-title" class="cta__title" data-split>Let's talk cloud, code <span class="grad-light">&amp; platforms</span></h2>
     <p class="cta__sub" data-reveal>Always happy to talk about cloud, code and platform engineering with fellow engineers.</p>
     <div class="cta__actions" data-reveal>
@@ -575,6 +620,7 @@
       <div class="footer__col">
         <h3>More</h3>
         <a href="#experience">Experience</a><a href="#skills">Skills</a><a href="#credentials">Credentials</a><a href="#contact">Contact</a>
+        <button type="button" class="footer__cmd" data-open-cmdk>Command palette <kbd>/</kbd></button>
       </div>
       <div class="footer__col">
         <h3>Connect</h3>
@@ -594,9 +640,18 @@
   </div>
 </footer>
 
+<div class="cmdk" id="cmdk" hidden>
+  <div class="cmdk__backdrop" data-close></div>
+  <div class="cmdk__box" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="cmdk__search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmdk-input" type="text" role="combobox" aria-expanded="true" aria-controls="cmdk-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Jump to a section or run a command"><kbd>Esc</kbd></div>
+    <ul class="cmdk__list" id="cmdk-list" role="listbox" aria-label="Commands" data-lenis-prevent></ul>
+    <p class="cmdk__foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> select</span><span><kbd>/</kbd> or <kbd>Ctrl K</kbd> to open</span></p>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>
 <script src="assets/js/main.js" defer></script>
+<script defer src="assets/js/interactive.js"></script>
 </body>
 </html>
