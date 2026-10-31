@@ -182,7 +182,7 @@
     tl.from('.line__in', { yPercent: 115, duration: 1.3, stagger: 0.12 }, 0.1)
       .from('.eyebrow, .hero__role, .hero__lead, .hero__ctas, .hero__chips', { y: 28, opacity: 0, duration: 1.1, stagger: 0.09 }, 0.35)
       .from('.hero__chips li', { y: 16, opacity: 0, duration: 0.8, stagger: 0.06 }, 0.8)
-      .from('.floater', { scale: 0.4, opacity: 0, duration: 1.4, stagger: 0.08, ease: 'back.out(1.6)' }, 0.4);
+      .from('#hero-canvas', { opacity: 0, duration: 1.6, ease: 'power2.out' }, 0.5);
     // parallax drift of hero content on scroll
     G.to('.hero__content', { yPercent: 18, opacity: 0.35, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
   }
@@ -535,7 +535,11 @@
     requestAnimationFrame(vloop);
   }
 
-  /* ---------------- hero scene: WebGL (Three.js) or 2D fallback ---------------- */
+  /* ---------------- hero visual: orbital cloud platform (Canvas 2D) ----------------
+     A calm, light composition placed in the free space beside the hero text:
+     an isometric platform stack (infra -> platform -> app) with three glass
+     cloud regions (Azure, AWS, OCI) on a tilted orbit, thin links and light
+     packets. No external libraries, so it looks the same everywhere. */
   const hero = $('.hero'), canvas = $('#hero-canvas');
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
   hero.addEventListener('pointermove', e => {
@@ -547,25 +551,12 @@
   let heroVisible = true;
   new IntersectionObserver(([en]) => { heroVisible = en.isIntersecting; }).observe(hero);
 
-  // floating glossy icons parallax
-  const floaters = $$('.floater');
-  if (!reduce && floaters.length) {
-    const fl = () => {
-      if (heroVisible) {
-        pointer.x += (pointer.tx - pointer.x) * 0.06; pointer.y += (pointer.ty - pointer.y) * 0.06;
-        floaters.forEach(f => { const d = +f.dataset.depth || 20; f.style.translate = `${(-pointer.x * d).toFixed(1)}px ${(-pointer.y * d).toFixed(1)}px`; });
-      }
-      requestAnimationFrame(fl);
-    };
-    fl();
-  }
-
   /* hero interaction: drag to orbit (mouse), click / tap the scene to deploy a node */
   const heroCtl = { spawn: null, dragging: false, orbit: { x: 0, y: 0, vx: 0, vy: 0 } };
   window.AK.hero = heroCtl;
   if (!reduce) {
     let drag = null, dragged = false;
-    const blocked = t => t.closest('.hero__content > *, a, button, input, .floater');
+    const blocked = t => t.closest('.hero__content > *, a, button, input');
     hero.addEventListener('pointerdown', e => {
       if (e.pointerType !== 'mouse' || e.button !== 0 || blocked(e.target)) return;
       drag = { x: e.clientX, y: e.clientY }; dragged = false;
@@ -576,7 +567,7 @@
       if (!dragged && Math.hypot(dx, dy) > 6) { dragged = true; heroCtl.dragging = true; hero.classList.add('is-dragging'); }
       if (dragged) {
         const o = heroCtl.orbit;
-        o.vy = dx * 0.006; o.vx = dy * 0.004; o.y += o.vy; o.x = Math.max(-0.7, Math.min(0.7, o.x + o.vx));
+        o.vy = dx * 0.006; o.vx = dy * 0.004; o.y += o.vy; o.x = Math.max(-1, Math.min(1, o.x + o.vx));
         drag.x = e.clientX; drag.y = e.clientY;
       }
     });
@@ -587,252 +578,310 @@
     });
     hero.addEventListener('click', e => {
       if (dragged || blocked(e.target) || !heroCtl.spawn) return;
-      heroCtl.spawn(e.clientX, e.clientY);
+      if (!heroCtl.spawn(e.clientX, e.clientY)) return;
       const pop = document.createElement('span');
       pop.className = 'hero__pop'; pop.textContent = '+ node deployed';
       const r = hero.getBoundingClientRect();
       pop.style.left = (e.clientX - r.left) + 'px'; pop.style.top = (e.clientY - r.top) + 'px';
-      hero.appendChild(pop); setTimeout(() => pop.remove(), 1100);
+      hero.appendChild(pop); setTimeout(() => pop.remove(), 1200);
     });
   }
   const orbitStep = () => {
     const o = heroCtl.orbit;
-    if (!heroCtl.dragging) { o.y += o.vy; o.vy *= 0.94; o.vx *= 0.9; o.x *= 0.985; }
+    if (!heroCtl.dragging) { o.y += o.vy; o.vy *= 0.94; o.vx *= 0.9; o.x *= 0.97; }
   };
 
-  const webglOK = (() => { try { const c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl'))); } catch (e) { return false; } })();
-  const useWebGL = webglOK && !reduce && !saveData && window.innerWidth >= 900;
-  const startScene = () => {
-    if (useWebGL) {
-      import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js')
-        .then(THREE => initThree(THREE))
-        .catch(() => init2D());
-    } else init2D();
-  };
-  if ('requestIdleCallback' in window) requestIdleCallback(startScene, { timeout: 1200 }); else setTimeout(startScene, 300);
+  const startScene = () => initOrbit();
+  if ('requestIdleCallback' in window) requestIdleCallback(startScene, { timeout: 600 }); else setTimeout(startScene, 200);
 
-  function initThree(THREE) {
-    let renderer;
-    try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' }); }
-    catch (e) { init2D(); return; }
-    root.classList.add('webgl');
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-    camera.position.set(0, 0, 18);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xc7d2fe, 1.1));
-    const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(6, 8, 10); scene.add(key);
-    const rim = new THREE.PointLight(0x5eead4, 30, 40); rim.position.set(-8, -4, 6); scene.add(rim);
-    const warm = new THREE.PointLight(0xfda4af, 25, 40); warm.position.set(8, -6, 4); scene.add(warm);
-
-    const world = new THREE.Group(); scene.add(world);
-    const mat = (color) => new THREE.MeshPhysicalMaterial({ color, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.12 });
-    const clusters = [
-      { name: 'azure', color: 0x3b82f6, pos: new THREE.Vector3(2.2, 1.6, 0) },
-      { name: 'aws', color: 0xf59e0b, pos: new THREE.Vector3(-2.4, 0.4, -1.2) },
-      { name: 'oci', color: 0xf43f5e, pos: new THREE.Vector3(1.0, -2.3, 0.8) }
-    ];
-    const boxGeo = new THREE.BoxGeometry(0.62, 0.62, 0.62);
-    const srvGeo = new THREE.BoxGeometry(0.55, 1.05, 0.55);
-    const coreGeo = new THREE.IcosahedronGeometry(0.95, 3);
-    const ringGeo = new THREE.TorusGeometry(1.45, 0.045, 12, 80);
-    const nodes = [];
-    clusters.forEach((c, ci) => {
-      const g = new THREE.Group(); g.position.copy(c.pos); world.add(g); c.group = g;
-      const core = new THREE.Mesh(coreGeo, mat(c.color)); g.add(core); c.core = core;
-      const ring = new THREE.Mesh(ringGeo, new THREE.MeshPhysicalMaterial({ color: 0x6366f1, roughness: 0.3, clearcoat: 1, transparent: true, opacity: 0.55 }));
-      ring.rotation.x = Math.PI / 2.4; ring.rotation.y = ci * 0.6; g.add(ring); c.ring = ring;
-      const palette = [0x6366f1, 0x14b8a6, 0xa855f7, 0x60a5fa, c.color];
-      for (let k = 0; k < 6; k++) {
-        const isSrv = k % 3 === 0;
-        const m = new THREE.Mesh(isSrv ? srvGeo : boxGeo, mat(palette[k % palette.length]));
-        const ang = (k / 6) * Math.PI * 2 + ci, rad = 1.9 + (k % 2) * 0.45;
-        m.userData = { ang, rad, y: (k % 3 - 1) * 0.55, spd: 0.15 + Math.random() * 0.15, ph: Math.random() * 6 };
-        m.rotation.set(Math.random(), Math.random(), 0);
-        g.add(m); nodes.push({ m, c });
-      }
-    });
-    // links
-    const linkPairs = [[0, 1], [1, 2], [2, 0]];
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x6366f1, transparent: true, opacity: 0.35 });
-    const lineGeo = new THREE.BufferGeometry();
-    const MAX_SPAWN = 12, spawned = [];
-    const linePos = new Float32Array((linkPairs.length + nodes.length + MAX_SPAWN) * 6);
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
-    world.add(new THREE.LineSegments(lineGeo, lineMat));
-    // packets travelling between clouds (migration flow)
-    const pktGeo = new THREE.SphereGeometry(0.11, 16, 16);
-    const packets = [];
-    for (let i = 0; i < 18; i++) {
-      const pm = new THREE.Mesh(pktGeo, new THREE.MeshBasicMaterial({ color: [0x4f46e5, 0x0d9488, 0xf97362][i % 3] }));
-      world.add(pm); packets.push({ m: pm, pair: linkPairs[i % 3], t: Math.random(), spd: 0.003 + Math.random() * 0.004, dir: i % 2 ? 1 : -1 });
-    }
-    // background dust
-    const dustGeo = new THREE.BufferGeometry(); const dn = 260; const dp = new Float32Array(dn * 3);
-    for (let i = 0; i < dn; i++) { dp[i * 3] = (Math.random() - 0.5) * 30; dp[i * 3 + 1] = (Math.random() - 0.5) * 18; dp[i * 3 + 2] = (Math.random() - 0.5) * 10 - 4; }
-    dustGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3));
-    const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0x818cf8, size: 0.06, transparent: true, opacity: 0.6 }));
-    scene.add(dust);
-
-    const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
-    // click-to-deploy: new container nodes fly in, with a packet burst
-    const burstGeo = new THREE.SphereGeometry(0.07, 10, 10);
-    const burst = Array.from({ length: 48 }, (_, i) => {
-      const m = new THREE.Mesh(burstGeo, new THREE.MeshBasicMaterial({ color: [0x4f46e5, 0x14b8a6, 0xf97362, 0xa855f7][i % 4], transparent: true }));
-      m.visible = false; world.add(m); return { m, v: new THREE.Vector3(), life: 0 };
-    });
-    const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
-    const spawnColors = [0x6366f1, 0x14b8a6, 0xa855f7, 0x60a5fa, 0xf97362];
-    heroCtl.spawn = (cx, cy) => {
-      const r = canvas.getBoundingClientRect();
-      ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
-      ray.setFromCamera(ndc, camera);
-      if (!ray.ray.intersectPlane(plane, hit)) return;
-      const local = world.worldToLocal(hit.clone());
-      const c = clusters.reduce((b, cl) => (cl.group.position.distanceTo(local) < b.group.position.distanceTo(local) ? cl : b));
-      const m = new THREE.Mesh(Math.random() < 0.5 ? boxGeo : srvGeo, mat(spawnColors[(Math.random() * spawnColors.length) | 0]));
-      m.userData = { ang: Math.random() * 6.28, rad: 2.4 + Math.random() * 0.9, y: (Math.random() - 0.5) * 1.4, spd: 0.2 + Math.random() * 0.2, ph: Math.random() * 6, born: clock.getElapsedTime(), from: local.clone() };
-      m.position.copy(local); m.scale.setScalar(0.01);
-      world.add(m); spawned.push({ m, c });
-      if (spawned.length > MAX_SPAWN) { const old = spawned.shift(); world.remove(old.m); old.m.material.dispose(); }
-      let n = 0;
-      for (const b of burst) {
-        if (b.life > 0) continue;
-        b.life = 1; b.m.visible = true; b.m.position.copy(local);
-        b.v.set(Math.random() - 0.5, Math.random() - 0.5, (Math.random() - 0.5) * 0.6).normalize().multiplyScalar(0.06 + Math.random() * 0.08);
-        if (++n >= 16) break;
-      }
-    };
-    root.classList.add('hero-playable');
-    const resize = () => {
-      const w = canvas.clientWidth, h = canvas.clientHeight;
-      renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-      world.position.x = w > 1200 ? 4.6 : w > 1000 ? 3.8 : 2.8;
-      world.scale.setScalar(w > 1200 ? 1 : 0.85);
-    };
-    resize();
-    let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 120); });
-    const clock = new THREE.Clock();
-    let running = true;
-    document.addEventListener('visibilitychange', () => { running = !document.hidden; });
-    const render = () => {
-      requestAnimationFrame(render);
-      if (!running || !heroVisible) { clock.getDelta(); return; }
-      const t = clock.getElapsedTime();
-      orbitStep();
-      const ob = heroCtl.orbit;
-      world.rotation.y += ((pointer.x * 0.35 + Math.sin(t * 0.15) * 0.15 + ob.y) - world.rotation.y) * 0.08;
-      world.rotation.x += ((pointer.y * 0.2 + ob.x) - world.rotation.x) * 0.08;
-      camera.position.y = -window.scrollY * 0.004;
-      clusters.forEach((c, i) => { c.group.position.y = c.pos.y + Math.sin(t * 0.8 + i * 2) * 0.18; c.core.rotation.y = t * 0.3; c.ring.rotation.z = t * (0.2 + i * 0.05); });
-      nodes.forEach(({ m }) => {
-        const u = m.userData; const a = u.ang + t * u.spd;
-        m.position.set(Math.cos(a) * u.rad, u.y + Math.sin(t + u.ph) * 0.15, Math.sin(a) * u.rad * 0.6);
-        m.rotation.x += 0.004; m.rotation.y += 0.006;
-      });
-      let o = 0;
-      linkPairs.forEach(([a, b]) => {
-        clusters[a].group.getWorldPosition(tmpA); clusters[b].group.getWorldPosition(tmpB);
-        world.worldToLocal(tmpA); world.worldToLocal(tmpB);
-        linePos.set([tmpA.x, tmpA.y, tmpA.z, tmpB.x, tmpB.y, tmpB.z], o); o += 6;
-      });
-      nodes.forEach(({ m, c }) => {
-        const gp = c.group.position;
-        linePos.set([gp.x, gp.y, gp.z, gp.x + m.position.x, gp.y + m.position.y, gp.z + m.position.z], o); o += 6;
-      });
-      spawned.forEach(({ m, c }) => {
-        const u = m.userData, a = u.ang + t * u.spd, gp = c.group.position;
-        tmpA.set(gp.x + Math.cos(a) * u.rad, gp.y + u.y + Math.sin(t + u.ph) * 0.15, gp.z + Math.sin(a) * u.rad * 0.6);
-        const k = Math.min(1, (t - u.born) / 0.9), e = 1 - Math.pow(1 - k, 3);
-        m.position.lerpVectors(u.from, tmpA, e); m.scale.setScalar(Math.max(0.01, e));
-        m.rotation.x += 0.01; m.rotation.y += 0.012;
-        linePos.set([gp.x, gp.y, gp.z, m.position.x, m.position.y, m.position.z], o); o += 6;
-      });
-      lineGeo.setDrawRange(0, o / 3);
-      burst.forEach(b => {
-        if (b.life <= 0) return;
-        b.life -= 0.022; b.m.position.add(b.v); b.v.multiplyScalar(0.95);
-        b.m.scale.setScalar(Math.max(0.01, b.life * 1.4)); b.m.material.opacity = Math.max(0, b.life);
-        if (b.life <= 0) b.m.visible = false;
-      });
-      lineGeo.attributes.position.needsUpdate = true;
-      packets.forEach(p => {
-        p.t += p.spd; if (p.t > 1) p.t = 0;
-        const [a, b] = p.dir > 0 ? p.pair : [p.pair[1], p.pair[0]];
-        p.m.position.lerpVectors(clusters[a].group.position, clusters[b].group.position, p.t);
-        p.m.scale.setScalar(0.6 + Math.sin(p.t * Math.PI) * 0.8);
-      });
-      dust.rotation.y = t * 0.01;
-      renderer.render(scene, camera);
-    };
-    render();
-  }
-
-  function init2D() {
+  function initOrbit() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    let W, H, dpr, nodes = [], pulses = [], rings = [], baseN = 0;
-    const colors = ['37,99,235', '79,70,229', '13,148,136', '244,63,94', '124,58,237'];
-    const mouse = { x: -1e4, y: -1e4 };
-    const resize = () => {
-      dpr = Math.min(devicePixelRatio || 1, 2); W = canvas.clientWidth; H = canvas.clientHeight;
-      canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const n = Math.round(Math.min(90, Math.max(28, (W * H) / 18000)));
-      baseN = n;
-      nodes = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, r: Math.random() * 2 + 1.2, c: colors[(Math.random() * colors.length) | 0] }));
+    const TAU = Math.PI * 2;
+    const INDIGO = '99,102,241', TEAL = '20,184,166', BLUE = '59,130,246', CORAL = '249,115,98';
+    const regions = [
+      { name: 'Azure', c: BLUE, off: 0 },
+      { name: 'AWS', c: CORAL, off: TAU / 3 },
+      { name: 'OCI', c: TEAL, off: (TAU * 2) / 3 }
+    ];
+    const plates = [{ c: TEAL, label: 'infra' }, { c: INDIGO, label: 'platform' }, { c: BLUE, label: 'app' }];
+    const OUT = 1.2;
+    let W = 0, H = 0, dpr = 1;
+    const L = { cx: 0, cy: 0, rx: 0 }, T = { cx: 0, cy: 0, rx: 0 };
+    let ready = false;
+
+    // composition extents for a given orbit radius (relative to the centre)
+    const extents = rx => {
+      const R = nodeR(rx), tilt = 0.42, ry2 = rx * OUT * tilt;
+      return { left: rx * OUT + R * 0.6, right: rx * OUT + R * 0.6, top: Math.max(ry2 + R + 6, rx * 0.66), bottom: ry2 + R + 34 };
     };
-    const LINK = 130;
+    const nodeR = rx => Math.max(15, Math.min(30, rx * 0.14));
+    const obstacles = () => {
+      const hr = hero.getBoundingClientRect();
+      const sel = '.hero__content .eyebrow, .hero__title .line, .hero__role, .hero__lead, .hero__ctas > *, .hero__chips li, .hero__hint, .hero__scroll';
+      return $$(sel).map(e => { const r = e.getBoundingClientRect(); const right = e.classList.contains('hero__role') ? Math.min(r.right, r.left + 470) : r.right; return { l: r.left - hr.left - 28, t: r.top - hr.top - 30, r: right - hr.left + 28, b: r.bottom - hr.top + 30 }; })
+        .filter(o => o.r - o.l > 60 && o.b > o.t && getComputedStyle(document.querySelector('.hero__content')).display !== 'none');
+    };
+    const solve = () => {
+      const obs = obstacles(), top = 86, pad = 14;
+      const maxRx = Math.min(290, W * 0.2, H * 0.36);
+      const px = W * 0.74, py = H * 0.52;
+      for (let rx = maxRx; rx >= 64; rx -= 6) {
+        const e = extents(rx); let best = null, bd = Infinity;
+        for (let cy = top + e.top; cy <= H - pad - e.bottom; cy += 8) {
+          for (let cx = W - pad - e.right; cx >= pad + e.left; cx -= 8) {
+            const box = { l: cx - e.left, r: cx + e.right, t: cy - e.top, b: cy + e.bottom };
+            if (obs.some(o => !(box.r < o.l || box.l > o.r || box.b < o.t || box.t > o.b))) continue;
+            const d = (cx - px) ** 2 + ((cy - py) * 1.4) ** 2;
+            if (d < bd) { bd = d; best = { cx, cy }; }
+          }
+        }
+        if (best) return { cx: best.cx, cy: best.cy, rx };
+      }
+      return { cx: W * 0.75, cy: H * 0.75, rx: 0 };
+    };
+    const layout = (snap) => {
+      const s = solve(); Object.assign(T, s);
+      if (snap || !ready) { Object.assign(L, s); ready = true; }
+    };
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = canvas.clientWidth; H = canvas.clientHeight;
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (window.scrollY < 40) layout(!ready);
+    };
+
+    // ambient particles + satellites + deployed nodes
+    const parts = Array.from({ length: 34 }, () => ({ u: Math.random(), v: Math.random(), s: 0.004 + Math.random() * 0.008, r: 0.8 + Math.random() * 1.2, ph: Math.random() * TAU, c: Math.random() < 0.7 ? INDIGO : TEAL }));
+    const sats = Array.from({ length: 5 }, (_, i) => ({ off: (i / 5) * TAU + 0.4, sp: 0.03 + i * 0.006 }));
+    const deployed = [], ripples = [];
+    const comets = Array.from({ length: 3 }, (_, i) => ({ off: (i / 3) * TAU + 1, sp: 0.35 + i * 0.05, c: [INDIGO, TEAL, CORAL][i] }));
+
+    const rgba = (c, a) => `rgba(${c},${a})`;
+    const ease = t => 1 - Math.pow(1 - t, 3);
+    let time = 0, last = performance.now(), rot = 0, tilt = 0.42, pX = 0, pY = 0;
+    const proj = (theta, k) => {
+      const x = L.cx + pX * 10 + Math.cos(theta) * L.rx * k;
+      const y = L.cy + pY * 6 + Math.sin(theta) * L.rx * k * tilt;
+      const d = Math.sin(theta);
+      return { x, y, d, s: 0.78 + 0.22 * (d + 1) / 2 };
+    };
+    const hub = () => ({ x: L.cx + pX * 6, y: L.cy + pY * 4 - L.rx * 0.08 });
+
+    const cloud = (x, y, w, c, a) => {
+      const h = w * 0.52;
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.42, y + h * 0.42);
+      ctx.arc(x - w * 0.24, y + h * 0.12, h * 0.34, Math.PI * 0.55, Math.PI * 1.5);
+      ctx.arc(x + w * 0.02, y - h * 0.08, h * 0.46, Math.PI * 1.1, Math.PI * 1.95);
+      ctx.arc(x + w * 0.27, y + h * 0.16, h * 0.28, Math.PI * 1.45, Math.PI * 0.45);
+      ctx.closePath();
+      ctx.fillStyle = rgba(c, a * 0.16); ctx.fill();
+      ctx.strokeStyle = rgba(c, a * 0.9); ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.stroke();
+    };
+    const pill = (x, y, text, c, a) => {
+      ctx.font = '600 12px Inter, system-ui, -apple-system, Segoe UI, sans-serif';
+      const tw = ctx.measureText(text).width, w = tw + 26, h = 22;
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, 11);
+      ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fill();
+      ctx.strokeStyle = rgba(c, 0.35); ctx.lineWidth = 1; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x - w / 2 + 11, y, 3, 0, TAU); ctx.fillStyle = rgba(c, 1); ctx.fill();
+      ctx.fillStyle = '#1e293b'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.fillText(text, x - w / 2 + 18, y + 0.5);
+      ctx.globalAlpha = 1;
+    };
+    const glassNode = (x, y, R, c, a, label, la = 1) => {
+      ctx.globalAlpha = a;
+      const halo = ctx.createRadialGradient(x, y, R * 0.6, x, y, R * 2.2);
+      halo.addColorStop(0, rgba(c, 0.16)); halo.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(x, y, R * 2.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(30,41,99,.08)'; ctx.beginPath(); ctx.ellipse(x, y + R * 1.12, R * 0.78, R * 0.2, 0, 0, TAU); ctx.fill();
+      ctx.save();
+      ctx.shadowColor = 'rgba(30,41,99,.16)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+      const body = ctx.createRadialGradient(x - R * 0.35, y - R * 0.45, R * 0.1, x, y, R);
+      body.addColorStop(0, 'rgba(255,255,255,1)'); body.addColorStop(0.7, 'rgba(255,255,255,.92)'); body.addColorStop(1, rgba(c, 0.18));
+      ctx.fillStyle = body; ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = rgba(c, 0.55); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = rgba(c, 0.18); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, R * 0.7, 0, TAU); ctx.stroke();
+      cloud(x, y + R * 0.02, R * 0.92, c, 1);
+      ctx.globalAlpha = 1;
+      if (label && la > 0.02) pill(x, y + R + 17, label, c, a * la);
+    };
+    const plate = (x, y, hw, hh, th, c, a) => {
+      // isometric rounded-ish rhombus with a thin edge
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.moveTo(x - hw, y); ctx.lineTo(x, y + hh); ctx.lineTo(x + hw, y); ctx.lineTo(x + hw, y + th); ctx.lineTo(x, y + hh + th); ctx.lineTo(x - hw, y + th); ctx.closePath();
+      ctx.fillStyle = rgba(c, 0.22); ctx.fill();
+      const g = ctx.createLinearGradient(x - hw, y - hh, x + hw, y + hh);
+      g.addColorStop(0, 'rgba(255,255,255,.96)'); g.addColorStop(1, rgba(c, 0.2));
+      ctx.beginPath(); ctx.moveTo(x, y - hh); ctx.lineTo(x + hw, y); ctx.lineTo(x, y + hh); ctx.lineTo(x - hw, y); ctx.closePath();
+      ctx.save(); ctx.shadowColor = 'rgba(30,41,99,.12)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6; ctx.fillStyle = g; ctx.fill(); ctx.restore();
+      ctx.strokeStyle = rgba(c, 0.6); ctx.lineWidth = 1.2; ctx.stroke();
+      // inner grid hint
+      ctx.strokeStyle = rgba(c, 0.18); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - hw / 2, y - hh / 2); ctx.lineTo(x + hw / 2, y + hh / 2); ctx.moveTo(x + hw / 2, y - hh / 2); ctx.lineTo(x - hw / 2, y + hh / 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    };
+    const curve = (a, b, lift) => ({ a, b, c: { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - lift } });
+    const bez = (q, u) => ({ x: (1 - u) * (1 - u) * q.a.x + 2 * (1 - u) * u * q.c.x + u * u * q.b.x, y: (1 - u) * (1 - u) * q.a.y + 2 * (1 - u) * u * q.c.y + u * u * q.b.y });
+    const dot = (x, y, r, c, a) => {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+      g.addColorStop(0, rgba(c, a)); g.addColorStop(0.35, rgba(c, a * 0.5)); g.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.beginPath(); ctx.arc(x, y, r * 0.55, 0, TAU); ctx.fill();
+    };
+
     const draw = () => {
       ctx.clearRect(0, 0, W, H);
-      rings = rings.filter(g => g.t < 1);
-      for (const g of rings) {
-        g.t += 0.025;
-        ctx.strokeStyle = `rgba(79,70,229,${(1 - g.t) * 0.6})`; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(g.x, g.y, 6 + g.t * 70, 0, Math.PI * 2); ctx.stroke();
-      }
-      for (const p of nodes) {
-        if (!reduce) {
-          p.x += p.vx; p.y += p.vy;
-          if (p.boost) { p.vx *= 0.97; p.vy *= 0.97; if (Math.hypot(p.vx, p.vy) < 0.35) p.boost = false; }
-          if (p.x < 0 || p.x > W) p.vx *= -1; if (p.y < 0 || p.y > H) p.vy *= -1;
-          const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
-          if (d < 110 && d > 0) { p.x += dx / d; p.y += dy / d; }
+      if (L.rx < 60) { drawParticles(0.6); return; }
+      const rx = L.rx, R = nodeR(rx), h = hub();
+      // soft glow
+      const glow = ctx.createRadialGradient(L.cx, L.cy, 0, L.cx, L.cy, rx * 1.7);
+      glow.addColorStop(0, rgba(INDIGO, 0.13)); glow.addColorStop(0.5, rgba(TEAL, 0.05)); glow.addColorStop(1, rgba(INDIGO, 0));
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(L.cx, L.cy, rx * 1.7, 0, TAU); ctx.fill();
+      const fl = ctx.createRadialGradient(L.cx, L.cy, rx * 0.2, L.cx, L.cy, rx * OUT);
+      fl.addColorStop(0, 'rgba(255,255,255,.55)'); fl.addColorStop(0.75, rgba(INDIGO, 0.05)); fl.addColorStop(1, rgba(INDIGO, 0.02));
+      ctx.save(); ctx.translate(L.cx + pX * 10, L.cy + pY * 6); ctx.scale(1, tilt); ctx.translate(-L.cx, -L.cy);
+      ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(L.cx, L.cy, rx * OUT, 0, TAU); ctx.fill(); ctx.restore();
+      drawParticles(1);
+      const ring = (k, from, to, a, dash) => {
+        ctx.setLineDash(dash || []); ctx.strokeStyle = rgba(INDIGO, a); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(L.cx + pX * 10, L.cy + pY * 6, rx * k, rx * k * tilt, 0, from, to); ctx.stroke(); ctx.setLineDash([]);
+      };
+      // items with depth
+      const items = [];
+      regions.forEach(rg => { const p = proj(rot + rg.off, 1); items.push({ d: p.d, f: () => drawRegion(rg, p, R, h) }); });
+      sats.forEach(s => { const p = proj(rot * 0.6 + s.off + time * s.sp, OUT); items.push({ d: p.d, f: () => { ctx.globalAlpha = 0.5 + 0.4 * (p.d + 1) / 2; ctx.fillStyle = '#fff'; ctx.strokeStyle = rgba(INDIGO, 0.55); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(p.x, p.y, 3.4 * p.s, 0, TAU); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1; } }); });
+      deployed.forEach(n => {
+        const k = Math.min(1, (time - n.born) / 0.9), e = ease(k);
+        const p = proj(rot + n.off, OUT);
+        const x = n.x + (p.x - n.x) * e, y = n.y + (p.y - n.y) * e;
+        items.push({ d: k < 1 ? 2 : p.d, f: () => {
+          if (k >= 1) { ctx.setLineDash([2, 4]); ctx.strokeStyle = rgba(n.c, 0.28); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(h.x, h.y); ctx.stroke(); ctx.setLineDash([]); }
+          const r = (6 + 2 * (1 - e)) * (k < 1 ? 1 : p.s);
+          ctx.save(); ctx.shadowColor = rgba(n.c, 0.5); ctx.shadowBlur = 10;
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.restore();
+          ctx.strokeStyle = rgba(n.c, 0.85); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+          ctx.fillStyle = rgba(n.c, 0.9); ctx.beginPath(); ctx.arc(x, y, r * 0.38, 0, TAU); ctx.fill();
+        } });
+      });
+      items.sort((a, b) => a.d - b.d);
+      ring(OUT, Math.PI, TAU, 0.16, [2, 6]); ring(1, Math.PI, TAU, 0.22);
+      items.filter(i => i.d < 0).forEach(i => i.f());
+      drawHub(h, rx);
+      ring(1, 0, Math.PI, 0.38); ring(OUT, 0, Math.PI, 0.24, [2, 6]);
+      // comets along the inner ring (front half only reads as motion along the orbit)
+      comets.forEach(cm => {
+        for (let j = 0; j < 6; j++) {
+          const p = proj(rot + cm.off + time * cm.sp - j * 0.035, 1);
+          ctx.fillStyle = rgba(cm.c, (0.7 - j * 0.11) * (0.45 + 0.55 * (p.d + 1) / 2));
+          ctx.beginPath(); ctx.arc(p.x, p.y, 2.2 - j * 0.25, 0, TAU); ctx.fill();
         }
-      }
-      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-        if (d2 < LINK * LINK) {
-          ctx.strokeStyle = `rgba(${a.c},${(1 - Math.sqrt(d2) / LINK) * 0.3})`; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-          if (!reduce && Math.random() < 0.0004 && pulses.length < 10) pulses.push({ a, b, t: 0 });
+      });
+      items.filter(i => i.d >= 0).forEach(i => i.f());
+      // ripples + sparks
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const rp = ripples[i], t = (time - rp.born) / 0.8;
+        if (t >= 1) { ripples.splice(i, 1); continue; }
+        const e = ease(t);
+        ctx.strokeStyle = rgba(INDIGO, 0.45 * (1 - t)); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, 6 + e * 34, 0, TAU); ctx.stroke();
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * TAU + rp.rot;
+          ctx.fillStyle = rgba(k % 2 ? TEAL : INDIGO, 0.8 * (1 - t));
+          ctx.beginPath(); ctx.arc(rp.x + Math.cos(a) * (8 + e * 26), rp.y + Math.sin(a) * (8 + e * 26), 1.6, 0, TAU); ctx.fill();
         }
-      }
-      for (const p of nodes) { ctx.fillStyle = `rgba(${p.c},.75)`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
-      pulses = pulses.filter(p => p.t <= 1);
-      for (const p of pulses) {
-        p.t += 0.02; const x = p.a.x + (p.b.x - p.a.x) * p.t, y = p.a.y + (p.b.y - p.a.y) * p.t;
-        const g = ctx.createRadialGradient(x, y, 0, x, y, 8); g.addColorStop(0, 'rgba(249,115,98,.95)'); g.addColorStop(1, 'rgba(79,70,229,0)');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
       }
     };
-    resize();
-    if (!reduce) {
-      heroCtl.spawn = (cx, cy) => {
-        const r = canvas.getBoundingClientRect(), x = cx - r.left, y = cy - r.top;
-        rings.push({ x, y, t: 0 });
-        for (let k = 0; k < 6; k++) {
-          const a = (k / 6) * Math.PI * 2 + Math.random(), sp = 2 + Math.random() * 2;
-          nodes.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: Math.random() * 2 + 2, c: colors[(Math.random() * colors.length) | 0], boost: true });
-        }
-        if (nodes.length > baseN + 48) nodes.splice(baseN, 6);
-      };
-      root.classList.add('hero-playable');
+    function drawParticles(a) {
+      const bx = L.rx >= 60 ? L.cx - L.rx * 1.8 : W * 0.5, bw = L.rx >= 60 ? L.rx * 3.6 : W * 0.5;
+      const by = L.rx >= 60 ? L.cy - L.rx * 1.2 : H * 0.1, bh = L.rx >= 60 ? L.rx * 2.4 : H * 0.8;
+      parts.forEach(p => {
+        const x = bx + ((p.u + Math.sin(time * 0.3 + p.ph) * 0.01) % 1) * bw;
+        const y = by + (1 - ((p.v + time * p.s) % 1)) * bh;
+        const edge = Math.min(1, Math.sin(((p.v + time * p.s) % 1) * Math.PI) * 1.5);
+        ctx.fillStyle = rgba(p.c, 0.35 * edge * a); ctx.beginPath(); ctx.arc(x, y, p.r, 0, TAU); ctx.fill();
+      });
     }
-    hero.addEventListener('pointermove', e => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; });
-    let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); if (reduce) draw(); }, 150); });
-    if (reduce) { draw(); return; }
-    const loop = () => { if (heroVisible && !document.hidden) draw(); requestAnimationFrame(loop); };
-    loop();
+    function drawRegion(rg, p, R, h) {
+      const q = curve({ x: h.x, y: h.y }, { x: p.x, y: p.y - R * p.s * 0.2 }, L.rx * 0.18);
+      const a = 0.42 + 0.58 * (p.d + 1) / 2;
+      const g = ctx.createLinearGradient(q.a.x, q.a.y, q.b.x, q.b.y);
+      g.addColorStop(0, rgba(INDIGO, 0.15 * a)); g.addColorStop(1, rgba(rg.c, 0.55 * a));
+      ctx.strokeStyle = g; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(q.a.x, q.a.y); ctx.quadraticCurveTo(q.c.x, q.c.y, q.b.x, q.b.y); ctx.stroke();
+      for (let k = 0; k < 2; k++) {
+        let u = (time * 0.22 + k * 0.5 + rg.off * 0.1) % 1; if (k) u = 1 - u;
+        const pt = bez(q, u);
+        dot(pt.x, pt.y, 2.1, k ? rg.c : INDIGO, 0.9 * Math.sin(u * Math.PI) * a);
+      }
+      glassNode(p.x, p.y, R * p.s, rg.c, a, rg.name, Math.max(0, Math.min(1, (p.d + 0.55) / 0.6)));
+    }
+    function drawHub(h, rx) {
+      const hw = rx * 0.21, hh = hw * 0.48, th = 4, gap = rx * 0.17;
+      const ys = plates.map((_, i) => h.y + rx * 0.14 - i * gap + Math.sin(time * 0.9 + i * 0.8) * 1.6);
+      // vertical guide + rising data
+      ctx.strokeStyle = rgba(INDIGO, 0.18); ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.moveTo(h.x, ys[0] + hh); ctx.lineTo(h.x, ys[2] - hh - 10); ctx.stroke(); ctx.setLineDash([]);
+      plates.forEach((pl, i) => {
+        plate(h.x, ys[i], hw, hh, th, pl.c, 1);
+        if (i < plates.length - 1) {
+          for (let k = 0; k < 2; k++) {
+            const u = (time * 0.5 + k * 0.5 + i * 0.3) % 1;
+            const y = ys[i] - u * gap, x = h.x + (k ? hw * 0.35 : -hw * 0.35) * (1 - u * 0.2);
+            dot(x, y, 1.6, k ? TEAL : INDIGO, 0.85 * Math.sin(u * Math.PI));
+          }
+        }
+        ctx.font = '500 10.5px "JetBrains Mono", ui-monospace, monospace';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(71,85,105,.75)';
+        ctx.strokeStyle = rgba(pl.c, 0.35); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(h.x + hw + 4, ys[i] + th / 2); ctx.lineTo(h.x + hw + 14, ys[i] + th / 2); ctx.stroke();
+        ctx.fillText(pl.label, h.x + hw + 18, ys[i] + th / 2);
+      });
+    }
+
+    heroCtl.spawn = reduce ? null : (cx, cy) => {
+      if (L.rx < 60) return false;
+      const r = canvas.getBoundingClientRect(), x = cx - r.left, y = cy - r.top;
+      const theta = Math.atan2((y - L.cy) / tilt, x - L.cx);
+      const cs = [INDIGO, TEAL, BLUE, CORAL];
+      deployed.push({ x, y, off: theta - rot, born: time, c: cs[deployed.length % cs.length] });
+      if (deployed.length > 8) deployed.shift();
+      ripples.push({ x, y, born: time, rot: Math.random() });
+      if (!running) frame(performance.now());
+      return true;
+    };
+    root.classList.add('hero-playable');
+
+    let running = false;
+    const frame = now => {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (!reduce) {
+        time += dt; orbitStep();
+        pX += (pointer.tx - pX) * 0.04; pY += (pointer.ty - pY) * 0.04;
+        rot = time * 0.07 + heroCtl.orbit.y * 0.8;
+        tilt = Math.max(0.3, Math.min(0.54, 0.42 + pY * 0.03 + heroCtl.orbit.x * 0.1));
+        L.cx += (T.cx - L.cx) * 0.06; L.cy += (T.cy - L.cy) * 0.06; L.rx += (T.rx - L.rx) * 0.06;
+      }
+      draw();
+    };
+    const loop = now => {
+      requestAnimationFrame(loop);
+      running = heroVisible && !document.hidden;
+      if (!running) { last = now; return; }
+      frame(now);
+    };
+    resize();
+    let rt;
+    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); layout(true); if (reduce) draw(); }, 150); });
+    const relayout = () => { if (window.scrollY < 40) { layout(false); if (reduce) draw(); } };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(relayout);
+    setTimeout(relayout, 2600);
+    if (reduce) { rot = 0.5; draw(); return; }
+    requestAnimationFrame(loop);
   }
 
   onScroll();
