@@ -46,7 +46,7 @@ The glossy 3D-style icons are hand-made inline SVG symbols (a hidden `<svg>` spr
 | Expertise | Bento cards, with Kubernetes pods that assemble into nodes |
 | Migrations | Horizontal pinned gallery of tilt cards (a swipe carousel on mobile) |
 | Projects, Experience, Skills, Credentials | Staggered reveals, timeline progress line, skill filters |
-| Contact | Magnetic buttons, orbiting icons, copy-email button |
+| Contact | Orbiting icons and a single magnetic "Message me on LinkedIn" button (LinkedIn is the only contact method) |
 | Footer | Large wordmark reveal, back-to-top button with scroll-progress ring |
 
 There is also a floating pill navigation that hides on scroll down, shows on scroll up and has a sliding active indicator. On mobile it opens a full-screen menu. On desktop there is a cursor follower.
@@ -59,9 +59,9 @@ All of these run in the browser with no network calls and no AI service. Replies
 |---|---|
 | **Prompt → platform playground** (`#playground`) | Type a request and press Enter, or tap a preset: *Migrate 78 environments to Azure*, *Add a CI/CD pipeline*, *Cut cloud costs*, *Deploy to Kubernetes*, *Enable DR failover*. A typed reply appears and the diagram animates: packets flow and the counter runs to 78, pipeline stages light up, spend ticks down from $1.5M to $1.1M, pods roll out and scale, or traffic fails over. Keyword matching picks the scene; anything else gets a friendly fallback. The first preset auto-plays once when the section first comes into view. |
 | **Interactive terminal** (`#iac`) | After the Terraform demo finishes, type commands or tap the chips: `help`, `whoami`, `skills [group]`, `ls projects`, `ls migrations`, `impact`, `experience`, `certs`, `contact`, `open <section>`, `history`, `clear`. ↑/↓ recall history and Tab completes. Output is read from the page content itself. |
-| **Command palette** | Press `/` or `Ctrl K` (`⌘K` on Mac), or use the search button in the nav or "Command palette" in the footer. Jump to any section, run a playground preset, open the terminal, copy the email address or open LinkedIn. Use ↑/↓ and Enter to choose; Esc closes it. |
+| **Command palette** | Press `/` or `Ctrl K` (`⌘K` on Mac), or use the search button in the nav or "Command palette" in the footer. Jump to any section, run a playground preset, open the terminal or open LinkedIn. Use ↑/↓ and Enter to choose; Esc closes it. |
 | **Kinetic headline** | Letters of the hero name react to the pointer. Click or tap the name for a wave. |
-| **Interactive hero scene** | Drag with the mouse to orbit the 3D scene. Click or tap empty space to deploy a node, which comes with a packet burst. |
+| **Interactive hero scene** | Drag with the mouse to gently orbit the cloud scene. Click or tap empty space to deploy a node, which comes with a ripple burst. |
 | **Cost slider** (Impact) | Drag to replay the optimisation between USD $1.5M and $1.1M. The values are interpolated between the two real figures. |
 | **Spotlight cards** | Cards glow and their borders light up under the cursor. On touch screens they glow briefly when tapped. |
 | **Click ripples** | Buttons, chips and filters ripple from the point of the click or tap. |

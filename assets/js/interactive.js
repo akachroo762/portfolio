@@ -164,13 +164,13 @@
         '<span class="ok">Commands</span>',
         '  whoami          who I am', '  skills [group]  languages, clouds and tools (groups: code, cloud, iac, …)',
         '  ls projects     notable projects', '  ls migrations   cloud migrations delivered', '  impact          outcomes, in numbers',
-        '  experience      career timeline', '  certs           certifications & education', '  contact         how to reach me',
+        '  experience      career timeline', '  certs           certifications & education', '  contact         how to reach me (LinkedIn)',
         '  open <section>  scroll to a section (e.g. open playground)', '  clear           clear the screen',
         '<span class="c">Tip: press / or Ctrl K anywhere for the command palette.</span>'
       ].join('\n'),
       whoami: () => ['<span class="ok">Aditya Kachroo</span>', '  Full-stack cloud engineer · 7+ years across cloud, DevOps and engineering',
         '  Code:   Python · C# (.NET) · JavaScript · HTML5 · CSS3', '  Clouds: Azure · AWS · Oracle Cloud (OCI) · VMware',
-        '  Approach: hands-on, I architect it, write the code and build it', '  Based in Australia'].join('\n'),
+        '  Approach: hands-on, I architect it, write the code and build it', '  Based in Australia', '  Contact: LinkedIn (type contact)'].join('\n'),
       skills: arg => {
         const f = pageFacts(); const keys = Object.keys(f.skillGroups);
         if (arg) {
@@ -190,7 +190,7 @@
       impact: () => list(pageFacts().stats, 'ok'),
       experience: () => list(pageFacts().exp),
       certs: () => { const f = pageFacts(); return list(f.certs) + '\n' + list(f.edu, 'k'); },
-      contact: () => `  Email     <span class="s">akachroo762@gmail.com</span>\n  LinkedIn  <span class="s">${esc(pageFacts().linkedin)}</span>`,
+      contact: () => { const li = pageFacts().linkedin; return `  LinkedIn  <a class="s" href="${esc(li)}" target="_blank" rel="noopener">${esc(li)}</a>\n<span class="c">  LinkedIn is the best way to reach me. Type open contact for the contact section.</span>`; },
       open: arg => { const k = Object.keys(sections).find(k => k.startsWith(arg || '-')); if (!k) return `<span class="c">Sections: ${Object.keys(sections).join(', ')}</span>`; setTimeout(() => go(sections[k]), 250); return `<span class="ok">→</span> opening ${k}…`; },
       clear: () => { tcode.innerHTML = ''; return null; },
       terraform: arg => /apply/.test(arg) ? '<span class="add">+</span> module.network, module.aks_platform, module.postgres, module.key_vault\n<span class="ok">Apply complete!</span> <span class="c">(illustrative, nothing was deployed)</span>' : '<span class="c">Usage: terraform apply</span>',
@@ -577,8 +577,7 @@
       .map(p => ({ group: 'Playground', label: `Run: ${p}`, hint: 'Scripted demo', icon: '✦', run: () => { go('#playground'); setTimeout(() => AK.playground && AK.playground.run(p), 900); } }));
     const actions = [
       { label: 'Open the terminal', hint: "Type 'help'", icon: '>_', run: () => { go('#iac'); setTimeout(() => AK.terminal && AK.terminal.focus(), 1100); } },
-      { label: 'Copy email address', hint: 'akachroo762@gmail.com', icon: '@', run: async () => { try { await navigator.clipboard.writeText('akachroo762@gmail.com'); toast('Email copied to clipboard'); } catch (e) { toast('akachroo762@gmail.com'); } } },
-      linkedin && { label: 'Connect on LinkedIn', hint: 'Opens in a new tab', icon: '↗', run: () => window.open(linkedin, '_blank', 'noopener') },
+      linkedin && { label: 'Message me on LinkedIn', hint: 'Opens in a new tab', icon: '↗', run: () => window.open(linkedin, '_blank', 'noopener') },
       { label: 'Back to top', hint: 'Scroll to the top', icon: '↑', run: () => go('#hero') }
     ].filter(Boolean).map(a => ({ group: 'Actions', ...a }));
     const all = [...secItems, ...prompts, ...actions];

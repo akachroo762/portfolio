@@ -161,7 +161,7 @@
     reveals.forEach(el => { el.style.opacity = ''; });
     ST.batch(reveals, {
       start: 'top 88%', once: true,
-      onEnter: batch => batch.forEach((el, i) => { el.style.setProperty('--d', `${i * 0.08}s`); el.classList.add('is-in'); })
+      onEnter: batch => batch.forEach((el, i) => { el.style.setProperty('--d', `${Math.min(i, 6) * 0.08}s`); el.classList.add('is-in'); })
     });
     splits.forEach(h => {
       const words = splitWords(h);
@@ -486,13 +486,6 @@
     skills.forEach(s => { const hit = f === 'all' || s.dataset.c === f; s.classList.toggle('is-dim', !hit); s.classList.toggle('is-hit', hit && f !== 'all'); });
   }));
 
-  /* ---------------- copy email ---------------- */
-  const copyBtn = $('#copy-email'), copyMsg = $('.copy-msg');
-  if (copyBtn) copyBtn.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText('akachroo762@gmail.com'); copyMsg.textContent = 'Email copied to clipboard.'; }
-    catch (e) { copyMsg.textContent = 'akachroo762@gmail.com'; }
-    setTimeout(() => (copyMsg.textContent = ''), 3000);
-  });
 
   /* ---------------- marquee: pause offscreen ---------------- */
   const marquee = $('.marquee');
